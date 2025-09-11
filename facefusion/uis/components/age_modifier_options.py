@@ -3,10 +3,10 @@ from typing import List, Optional, Tuple
 import gradio
 
 from facefusion import state_manager, wording
-from facefusion.common_helper import calc_float_step
+from facefusion.common_helper import calculate_float_step
 from facefusion.processors import choices as processors_choices
 from facefusion.processors.core import load_processor_module
-from facefusion.processors.typing import AgeModifierModel
+from facefusion.processors.types import AgeModifierModel
 from facefusion.uis.core import get_ui_component, register_ui_component
 
 AGE_MODIFIER_MODEL_DROPDOWN : Optional[gradio.Dropdown] = None
@@ -17,19 +17,20 @@ def render() -> None:
 	global AGE_MODIFIER_MODEL_DROPDOWN
 	global AGE_MODIFIER_DIRECTION_SLIDER
 
+	has_age_modifier = 'age_modifier' in state_manager.get_item('processors')
 	AGE_MODIFIER_MODEL_DROPDOWN = gradio.Dropdown(
 		label = wording.get('uis.age_modifier_model_dropdown'),
 		choices = processors_choices.age_modifier_models,
 		value = state_manager.get_item('age_modifier_model'),
-		visible = 'age_modifier' in state_manager.get_item('processors')
+		visible = has_age_modifier
 	)
 	AGE_MODIFIER_DIRECTION_SLIDER = gradio.Slider(
 		label = wording.get('uis.age_modifier_direction_slider'),
 		value = state_manager.get_item('age_modifier_direction'),
-		step = calc_float_step(processors_choices.age_modifier_direction_range),
+		step = calculate_float_step(processors_choices.age_modifier_direction_range),
 		minimum = processors_choices.age_modifier_direction_range[0],
 		maximum = processors_choices.age_modifier_direction_range[-1],
-		visible = 'age_modifier' in state_manager.get_item('processors')
+		visible = has_age_modifier
 	)
 	register_ui_component('age_modifier_model_dropdown', AGE_MODIFIER_MODEL_DROPDOWN)
 	register_ui_component('age_modifier_direction_slider', AGE_MODIFIER_DIRECTION_SLIDER)

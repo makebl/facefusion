@@ -3,10 +3,10 @@ from typing import List, Optional, Tuple
 import gradio
 
 from facefusion import state_manager, wording
-from facefusion.common_helper import calc_int_step
+from facefusion.common_helper import calculate_int_step
 from facefusion.processors import choices as processors_choices
 from facefusion.processors.core import load_processor_module
-from facefusion.processors.typing import FrameEnhancerModel
+from facefusion.processors.types import FrameEnhancerModel
 from facefusion.uis.core import get_ui_component, register_ui_component
 
 FRAME_ENHANCER_MODEL_DROPDOWN : Optional[gradio.Dropdown] = None
@@ -17,19 +17,20 @@ def render() -> None:
 	global FRAME_ENHANCER_MODEL_DROPDOWN
 	global FRAME_ENHANCER_BLEND_SLIDER
 
+	has_frame_enhancer = 'frame_enhancer' in state_manager.get_item('processors')
 	FRAME_ENHANCER_MODEL_DROPDOWN = gradio.Dropdown(
 		label = wording.get('uis.frame_enhancer_model_dropdown'),
 		choices = processors_choices.frame_enhancer_models,
 		value = state_manager.get_item('frame_enhancer_model'),
-		visible = 'frame_enhancer' in state_manager.get_item('processors')
+		visible = has_frame_enhancer
 	)
 	FRAME_ENHANCER_BLEND_SLIDER = gradio.Slider(
 		label = wording.get('uis.frame_enhancer_blend_slider'),
 		value = state_manager.get_item('frame_enhancer_blend'),
-		step = calc_int_step(processors_choices.frame_enhancer_blend_range),
+		step = calculate_int_step(processors_choices.frame_enhancer_blend_range),
 		minimum = processors_choices.frame_enhancer_blend_range[0],
 		maximum = processors_choices.frame_enhancer_blend_range[-1],
-		visible = 'frame_enhancer' in state_manager.get_item('processors')
+		visible = has_frame_enhancer
 	)
 	register_ui_component('frame_enhancer_model_dropdown', FRAME_ENHANCER_MODEL_DROPDOWN)
 	register_ui_component('frame_enhancer_blend_slider', FRAME_ENHANCER_BLEND_SLIDER)

@@ -9,7 +9,7 @@ from facefusion.core import process_step
 from facefusion.filesystem import is_directory, is_image, is_video
 from facefusion.jobs import job_helper, job_manager, job_runner, job_store
 from facefusion.temp_helper import clear_temp_directory
-from facefusion.typing import Args, UiWorkflow
+from facefusion.types import Args, UiWorkflow
 from facefusion.uis.core import get_ui_component
 from facefusion.uis.ui_helper import suggest_output_path
 
@@ -54,7 +54,7 @@ def listen() -> None:
 	if output_image and output_video:
 		INSTANT_RUNNER_START_BUTTON.click(start, outputs = [ INSTANT_RUNNER_START_BUTTON, INSTANT_RUNNER_STOP_BUTTON ])
 		INSTANT_RUNNER_START_BUTTON.click(run, outputs = [ INSTANT_RUNNER_START_BUTTON, INSTANT_RUNNER_STOP_BUTTON, output_image, output_video ])
-		INSTANT_RUNNER_STOP_BUTTON.click(stop, outputs = [ INSTANT_RUNNER_START_BUTTON, INSTANT_RUNNER_STOP_BUTTON ])
+		INSTANT_RUNNER_STOP_BUTTON.click(stop, outputs = [ INSTANT_RUNNER_START_BUTTON, INSTANT_RUNNER_STOP_BUTTON, output_image, output_video ])
 		INSTANT_RUNNER_CLEAR_BUTTON.click(clear, outputs = [ output_image, output_video ])
 	if ui_workflow_dropdown:
 		ui_workflow_dropdown.change(remote_update, inputs = ui_workflow_dropdown, outputs = INSTANT_RUNNER_WRAPPER)
@@ -92,14 +92,14 @@ def create_and_run_job(step_args : Args) -> bool:
 	job_id = job_helper.suggest_job_id('ui')
 
 	for key in job_store.get_job_keys():
-		state_manager.sync_item(key) #type:ignore
+		state_manager.sync_item(key) #type:ignore[arg-type]
 
 	return job_manager.create_job(job_id) and job_manager.add_step(job_id, step_args) and job_manager.submit_job(job_id) and job_runner.run_job(job_id, process_step)
 
 
-def stop() -> Tuple[gradio.Button, gradio.Button]:
+def stop() -> Tuple[gradio.Button, gradio.Button, gradio.Image, gradio.Video]:
 	process_manager.stop()
-	return gradio.Button(visible = True), gradio.Button(visible = False)
+	return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None), gradio.Video(value = None)
 
 
 def clear() -> Tuple[gradio.Image, gradio.Video]:

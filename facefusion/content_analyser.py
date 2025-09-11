@@ -1,64 +1,128 @@
 from functools import lru_cache
+from typing import List, Tuple
 
-import cv2
 import numpy
 from tqdm import tqdm
 
 from facefusion import inference_manager, state_manager, wording
-from facefusion.download import conditional_download_hashes, conditional_download_sources
+from facefusion.common_helper import is_macos
+from facefusion.download import conditional_download_hashes, conditional_download_sources, resolve_download_url
+from facefusion.execution import has_execution_provider
 from facefusion.filesystem import resolve_relative_path
 from facefusion.thread_helper import conditional_thread_semaphore
-from facefusion.typing import Fps, InferencePool, ModelOptions, ModelSet, VisionFrame
-from facefusion.vision import count_video_frame_total, detect_video_fps, get_video_frame, read_image
+from facefusion.types import Detection, DownloadScope, DownloadSet, ExecutionProvider, Fps, InferencePool, ModelSet, VisionFrame
+from facefusion.vision import detect_video_fps, fit_contain_frame, read_image, read_video_frame
 
-MODEL_SET : ModelSet =\
-{
-	'open_nsfw':
-	{
-		'hashes':
-		{
-			'content_analyser':
-			{
-				'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models-3.0.0/open_nsfw.hash',
-				'path': resolve_relative_path('../.assets/models/open_nsfw.hash')
-			}
-		},
-		'sources':
-		{
-			'content_analyser':
-			{
-				'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models-3.0.0/open_nsfw.onnx',
-				'path': resolve_relative_path('../.assets/models/open_nsfw.onnx')
-			}
-		},
-		'size': (224, 224),
-		'mean': [ 104, 117, 123 ]
-	}
-}
-PROBABILITY_LIMIT = 0.80
-RATE_LIMIT = 10
 STREAM_COUNTER = 0
 
 
+@lru_cache()
+def create_static_model_set(download_scope : DownloadScope) -> ModelSet:
+	return\
+	{
+		'nsfw_1':
+		{
+			'hashes':
+			{
+				'content_analyser':
+				{
+					'url': resolve_download_url('models-3.3.0', 'nsfw_1.hash'),
+					'path': resolve_relative_path('../.assets/models/nsfw_1.hash')
+				}
+			},
+			'sources':
+			{
+				'content_analyser':
+				{
+					'url': resolve_download_url('models-3.3.0', 'nsfw_1.onnx'),
+					'path': resolve_relative_path('../.assets/models/nsfw_1.onnx')
+				}
+			},
+			'size': (640, 640),
+			'mean': (0.0, 0.0, 0.0),
+			'standard_deviation': (1.0, 1.0, 1.0)
+		},
+		'nsfw_2':
+		{
+			'hashes':
+			{
+				'content_analyser':
+				{
+					'url': resolve_download_url('models-3.3.0', 'nsfw_2.hash'),
+					'path': resolve_relative_path('../.assets/models/nsfw_2.hash')
+				}
+			},
+			'sources':
+			{
+				'content_analyser':
+				{
+					'url': resolve_download_url('models-3.3.0', 'nsfw_2.onnx'),
+					'path': resolve_relative_path('../.assets/models/nsfw_2.onnx')
+				}
+			},
+			'size': (384, 384),
+			'mean': (0.5, 0.5, 0.5),
+			'standard_deviation': (0.5, 0.5, 0.5)
+		},
+		'nsfw_3':
+		{
+			'hashes':
+			{
+				'content_analyser':
+				{
+					'url': resolve_download_url('models-3.3.0', 'nsfw_3.hash'),
+					'path': resolve_relative_path('../.assets/models/nsfw_3.hash')
+				}
+			},
+			'sources':
+			{
+				'content_analyser':
+				{
+					'url': resolve_download_url('models-3.3.0', 'nsfw_3.onnx'),
+					'path': resolve_relative_path('../.assets/models/nsfw_3.onnx')
+				}
+			},
+			'size': (448, 448),
+			'mean': (0.48145466, 0.4578275, 0.40821073),
+			'standard_deviation': (0.26862954, 0.26130258, 0.27577711)
+		}
+	}
+
+
 def get_inference_pool() -> InferencePool:
-	model_sources = get_model_options().get('sources')
-	return inference_manager.get_inference_pool(__name__, model_sources)
+	model_names = [ 'nsfw_1', 'nsfw_2', 'nsfw_3' ]
+	_, model_source_set = collect_model_downloads()
+
+	return inference_manager.get_inference_pool(__name__, model_names, model_source_set)
 
 
 def clear_inference_pool() -> None:
-	inference_manager.clear_inference_pool(__name__)
+	model_names = [ 'nsfw_1', 'nsfw_2', 'nsfw_3' ]
+	inference_manager.clear_inference_pool(__name__, model_names)
 
 
-def get_model_options() -> ModelOptions:
-	return MODEL_SET.get('open_nsfw')
+def resolve_execution_providers() -> List[ExecutionProvider]:
+	if is_macos() and has_execution_provider('coreml'):
+		return [ 'cpu' ]
+	return state_manager.get_item('execution_providers')
+
+
+def collect_model_downloads() -> Tuple[DownloadSet, DownloadSet]:
+	model_set = create_static_model_set('full')
+	model_hash_set = {}
+	model_source_set = {}
+
+	for content_analyser_model in [ 'nsfw_1', 'nsfw_2', 'nsfw_3' ]:
+		model_hash_set[content_analyser_model] = model_set.get(content_analyser_model).get('hashes').get('content_analyser')
+		model_source_set[content_analyser_model] = model_set.get(content_analyser_model).get('sources').get('content_analyser')
+
+	return model_hash_set, model_source_set
 
 
 def pre_check() -> bool:
-	download_directory_path = resolve_relative_path('../.assets/models')
-	model_hashes = get_model_options().get('hashes')
-	model_sources = get_model_options().get('sources')
+	model_hash_set, model_source_set = collect_model_downloads()
 
-	return conditional_download_hashes(download_directory_path, model_hashes) and conditional_download_sources(download_directory_path, model_sources)
+	return conditional_download_hashes(model_hash_set) and conditional_download_sources(model_source_set)
 
 
 def analyse_stream(vision_frame : VisionFrame, video_fps : Fps) -> bool:
@@ -71,54 +135,92 @@ def analyse_stream(vision_frame : VisionFrame, video_fps : Fps) -> bool:
 
 
 def analyse_frame(vision_frame : VisionFrame) -> bool:
-	vision_frame = prepare_frame(vision_frame)
-	probability = forward(vision_frame)
-
-	return probability > PROBABILITY_LIMIT
+	return detect_nsfw(vision_frame)
 
 
-def forward(vision_frame : VisionFrame) -> float:
-	content_analyser = get_inference_pool().get('content_analyser')
-
-	with conditional_thread_semaphore():
-		probability = content_analyser.run(None,
-		{
-			'input': vision_frame
-		})[0][0][1]
-
-	return probability
-
-
-def prepare_frame(vision_frame : VisionFrame) -> VisionFrame:
-	model_size = get_model_options().get('size')
-	model_mean = get_model_options().get('mean')
-	vision_frame = cv2.resize(vision_frame, model_size).astype(numpy.float32)
-	vision_frame -= numpy.array(model_mean).astype(numpy.float32)
-	vision_frame = numpy.expand_dims(vision_frame, axis = 0)
-	return vision_frame
-
-
-@lru_cache(maxsize = None)
+@lru_cache()
 def analyse_image(image_path : str) -> bool:
-	frame = read_image(image_path)
-	return analyse_frame(frame)
+	vision_frame = read_image(image_path)
+	return analyse_frame(vision_frame)
 
 
-@lru_cache(maxsize = None)
-def analyse_video(video_path : str, start_frame : int, end_frame : int) -> bool:
-	video_frame_total = count_video_frame_total(video_path)
+@lru_cache()
+def analyse_video(video_path : str, trim_frame_start : int, trim_frame_end : int) -> bool:
 	video_fps = detect_video_fps(video_path)
-	frame_range = range(start_frame or 0, end_frame or video_frame_total)
+	frame_range = range(trim_frame_start, trim_frame_end)
 	rate = 0.0
+	total = 0
 	counter = 0
 
 	with tqdm(total = len(frame_range), desc = wording.get('analysing'), unit = 'frame', ascii = ' =', disable = state_manager.get_item('log_level') in [ 'warn', 'error' ]) as progress:
+
 		for frame_number in frame_range:
 			if frame_number % int(video_fps) == 0:
-				frame = get_video_frame(video_path, frame_number)
-				if analyse_frame(frame):
+				vision_frame = read_video_frame(video_path, frame_number)
+				total += 1
+				if analyse_frame(vision_frame):
 					counter += 1
-			rate = counter * int(video_fps) / len(frame_range) * 100
-			progress.update()
+			if counter > 0 and total > 0:
+				rate = counter / total * 100
 			progress.set_postfix(rate = rate)
-	return rate > RATE_LIMIT
+			progress.update()
+
+	return bool(rate > 10.0)
+
+
+def detect_nsfw(vision_frame : VisionFrame) -> bool:
+	is_nsfw_1 = detect_with_nsfw_1(vision_frame)
+	is_nsfw_2 = detect_with_nsfw_2(vision_frame)
+	is_nsfw_3 = detect_with_nsfw_3(vision_frame)
+
+	return is_nsfw_1 and is_nsfw_2 or is_nsfw_1 and is_nsfw_3 or is_nsfw_2 and is_nsfw_3
+
+
+def detect_with_nsfw_1(vision_frame : VisionFrame) -> bool:
+	detect_vision_frame = prepare_detect_frame(vision_frame, 'nsfw_1')
+	detection = forward_nsfw(detect_vision_frame, 'nsfw_1')
+	detection_score = numpy.max(numpy.amax(detection[:, 4:], axis = 1))
+	return bool(detection_score > 0.2)
+
+
+def detect_with_nsfw_2(vision_frame : VisionFrame) -> bool:
+	detect_vision_frame = prepare_detect_frame(vision_frame, 'nsfw_2')
+	detection = forward_nsfw(detect_vision_frame, 'nsfw_2')
+	detection_score = detection[0] - detection[1]
+	return bool(detection_score > 0.25)
+
+
+def detect_with_nsfw_3(vision_frame : VisionFrame) -> bool:
+	detect_vision_frame = prepare_detect_frame(vision_frame, 'nsfw_3')
+	detection = forward_nsfw(detect_vision_frame, 'nsfw_3')
+	detection_score = (detection[2] + detection[3]) - (detection[0] + detection[1])
+	return bool(detection_score > 10.5)
+
+
+def forward_nsfw(vision_frame : VisionFrame, model_name : str) -> Detection:
+	content_analyser = get_inference_pool().get(model_name)
+
+	with conditional_thread_semaphore():
+		detection = content_analyser.run(None,
+		{
+			'input': vision_frame
+		})[0]
+
+	if model_name in [ 'nsfw_2', 'nsfw_3' ]:
+		return detection[0]
+
+	return detection
+
+
+def prepare_detect_frame(temp_vision_frame : VisionFrame, model_name : str) -> VisionFrame:
+	model_set = create_static_model_set('full').get(model_name)
+	model_size = model_set.get('size')
+	model_mean = model_set.get('mean')
+	model_standard_deviation = model_set.get('standard_deviation')
+
+	detect_vision_frame = fit_contain_frame(temp_vision_frame, model_size)
+	detect_vision_frame = detect_vision_frame[:, :, ::-1] / 255.0
+	detect_vision_frame -= model_mean
+	detect_vision_frame /= model_standard_deviation
+	detect_vision_frame = numpy.expand_dims(detect_vision_frame.transpose(2, 0, 1), axis = 0).astype(numpy.float32)
+	return detect_vision_frame

@@ -3,8 +3,8 @@ from typing import List, Optional
 import gradio
 
 from facefusion import state_manager, wording
-from facefusion.filesystem import list_directory
-from facefusion.processors.core import clear_processors_modules, get_processors_modules
+from facefusion.filesystem import get_file_name, resolve_file_paths
+from facefusion.processors.core import get_processors_modules
 from facefusion.uis.core import register_ui_component
 
 PROCESSORS_CHECKBOX_GROUP : Optional[gradio.CheckboxGroup] = None
@@ -26,15 +26,24 @@ def listen() -> None:
 
 
 def update_processors(processors : List[str]) -> gradio.CheckboxGroup:
-	clear_processors_modules(state_manager.get_item('processors'))
-	state_manager.set_item('processors', processors)
-
 	for processor_module in get_processors_modules(state_manager.get_item('processors')):
+		if hasattr(processor_module, 'clear_inference_pool'):
+			processor_module.clear_inference_pool()
+
+	for processor_module in get_processors_modules(processors):
 		if not processor_module.pre_check():
 			return gradio.CheckboxGroup()
+
+	state_manager.set_item('processors', processors)
 	return gradio.CheckboxGroup(value = state_manager.get_item('processors'), choices = sort_processors(state_manager.get_item('processors')))
 
 
 def sort_processors(processors : List[str]) -> List[str]:
-	available_processors = list_directory('facefusion/processors/modules')
-	return sorted(available_processors, key = lambda processor : processors.index(processor) if processor in processors else len(processors))
+	available_processors = [ get_file_name(file_path) for file_path in resolve_file_paths('facefusion/processors/modules') ]
+	current_processors = []
+
+	for processor in processors + available_processors:
+		if processor in available_processors and processor not in current_processors:
+			current_processors.append(processor)
+
+	return current_processors

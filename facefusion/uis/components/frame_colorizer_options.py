@@ -3,10 +3,10 @@ from typing import List, Optional, Tuple
 import gradio
 
 from facefusion import state_manager, wording
-from facefusion.common_helper import calc_int_step
+from facefusion.common_helper import calculate_int_step
 from facefusion.processors import choices as processors_choices
 from facefusion.processors.core import load_processor_module
-from facefusion.processors.typing import FrameColorizerModel
+from facefusion.processors.types import FrameColorizerModel
 from facefusion.uis.core import get_ui_component, register_ui_component
 
 FRAME_COLORIZER_MODEL_DROPDOWN : Optional[gradio.Dropdown] = None
@@ -19,25 +19,26 @@ def render() -> None:
 	global FRAME_COLORIZER_SIZE_DROPDOWN
 	global FRAME_COLORIZER_BLEND_SLIDER
 
+	has_frame_colorizer = 'frame_colorizer' in state_manager.get_item('processors')
 	FRAME_COLORIZER_MODEL_DROPDOWN = gradio.Dropdown(
 		label = wording.get('uis.frame_colorizer_model_dropdown'),
 		choices = processors_choices.frame_colorizer_models,
 		value = state_manager.get_item('frame_colorizer_model'),
-		visible = 'frame_colorizer' in state_manager.get_item('processors')
+		visible = has_frame_colorizer
 	)
 	FRAME_COLORIZER_SIZE_DROPDOWN = gradio.Dropdown(
 		label = wording.get('uis.frame_colorizer_size_dropdown'),
 		choices = processors_choices.frame_colorizer_sizes,
 		value = state_manager.get_item('frame_colorizer_size'),
-		visible = 'frame_colorizer' in state_manager.get_item('processors')
+		visible = has_frame_colorizer
 	)
 	FRAME_COLORIZER_BLEND_SLIDER = gradio.Slider(
 		label = wording.get('uis.frame_colorizer_blend_slider'),
 		value = state_manager.get_item('frame_colorizer_blend'),
-		step = calc_int_step(processors_choices.frame_colorizer_blend_range),
+		step = calculate_int_step(processors_choices.frame_colorizer_blend_range),
 		minimum = processors_choices.frame_colorizer_blend_range[0],
 		maximum = processors_choices.frame_colorizer_blend_range[-1],
-		visible = 'frame_colorizer' in state_manager.get_item('processors')
+		visible = has_frame_colorizer
 	)
 	register_ui_component('frame_colorizer_model_dropdown', FRAME_COLORIZER_MODEL_DROPDOWN)
 	register_ui_component('frame_colorizer_size_dropdown', FRAME_COLORIZER_SIZE_DROPDOWN)
