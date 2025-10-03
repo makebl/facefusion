@@ -37,37 +37,29 @@ def run_pip(args : Iterable[str]) -> None:
         imported we fall back to invoking the user's Python interpreter.
         """
 
-        try:
-                from pip._internal.cli.main import main as pip_main  # type: ignore
-        except Exception as error:  # pragma: no cover - best effort fallback
-                python_candidates = []
-                if is_windows():
-                        python_candidates.extend(
-                        [
-                                os.path.join(os.getenv('CONDA_PREFIX', ''), 'python.exe'),
-                                shutil.which('pythonw'),
-                                shutil.which('python')
-                        ])
-                else:
-                        python_candidates.extend(
-                        [
-                                os.path.join(os.getenv('CONDA_PREFIX', ''), 'bin', 'python3'),
-                                shutil.which('python3'),
-                                shutil.which('python')
-                        ])
-                python_candidates.append(sys.executable)
-                python_executable = next(
-                        (candidate for candidate in python_candidates if candidate and os.path.exists(candidate)),
-                        None
-                )
-                if not python_executable:
-                        raise InstallerError('无法找到可用的 Python 或 pip 来安装依赖。') from error
-                exit_code = subprocess.call([ python_executable, '-m', 'pip', *list(args) ])
+        pip_args = list(args)
+
+        if getattr(sys, 'frozen', False):
+                python_executable = _locate_python_for_pip()
+                exit_code = subprocess.call([ python_executable, '-m', 'pip', *pip_args ])
         else:
-                exit_code = pip_main(list(args))
+                try:
+                        from pip._internal.cli.main import main as pip_main  # type: ignore
+                except Exception:  # pragma: no cover - best effort fallback
+                        python_executable = _locate_python_for_pip()
+                        exit_code = subprocess.call([ python_executable, '-m', 'pip', *pip_args ])
+                else:
+                        exit_code = pip_main(pip_args)
 
         if exit_code != 0:
                 raise InstallerError('pip 执行失败 (退出代码 {code})。'.format(code = exit_code))
+
+
+def _locate_python_for_pip() -> str:
+        try:
+                return locate_python_interpreter()
+        except InstallerError as error:
+                raise InstallerError('无法找到可用的 Python 或 pip 来安装依赖。') from error
 
 
 def locate_python_interpreter() -> str:
