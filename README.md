@@ -25,6 +25,16 @@ Run `python desktop_installer.py` to launch a simple graphical helper that insta
 
 To distribute the helper as a standalone Windows executable, install [PyInstaller](https://pyinstaller.org) and run `python build_facefusion_installer.py`. The resulting `FaceFusionInstaller.exe` is written to the `dist/` directory and contains everything needed to install the environment and immediately start FaceFusion.
 
+### Windows NSIS installer
+
+For a fully automated Windows setup that bootstraps Miniconda, installs all Python dependencies, and configures environment variables for command-line access, compile `facefusion_installer.nsi` with [NSIS](https://nsis.sourceforge.io/Main_Page):
+
+```
+makensis facefusion_installer.nsi
+```
+
+The generated `FaceFusionSetup.exe` installs FaceFusion into `Program Files`, prepares an isolated Conda environment with the project requirements, updates the system `PATH`, and adds Start Menu shortcuts for launching FaceFusion or an activated terminal session.
+
 
 Usage
 -----
