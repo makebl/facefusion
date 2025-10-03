@@ -23,15 +23,18 @@ def main() -> None:
         f'{project_root / "facefusion"}{data_separator}facefusion'
     ]
 
+    # Collecting the entire ``facefusion`` package caused PyInstaller to walk
+    # optional dependencies that are not needed for the installer UI. Relying on
+    # the regular import graph keeps the analysis lightweight and avoids
+    # crashes triggered by third-party bytecode during the build step.
     args = [
         '--noconfirm',
         '--clean',
         '--onefile',
         '--windowed',
-        '--collect-submodules=facefusion',
-        '--collect-data=facefusion',
         '--collect-data=tkinter',
         '--collect-binaries=tkinter',
+        '--hidden-import=facefusion.installer',
         f'--name=FaceFusionInstaller',
         f'--icon={project_root / "facefusion.ico"}'
     ]
