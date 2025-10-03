@@ -37,13 +37,13 @@ def run_pip(args : Iterable[str]) -> None:
         pip_arguments = list(args)
 
         if getattr(sys, 'frozen', False):
-                python_executable = locate_python_interpreter()
+                python_executable = locate_python_interpreter(require_console = True)
                 exit_code = subprocess.call([ python_executable, '-m', 'pip', *pip_arguments ])
         else:
                 try:
                         from pip._internal.cli.main import main as pip_main  # type: ignore
                 except Exception:  # pragma: no cover - best effort fallback
-                        python_executable = locate_python_interpreter()
+                        python_executable = locate_python_interpreter(require_console = True)
                         exit_code = subprocess.call([ python_executable, '-m', 'pip', *pip_arguments ])
                 else:
                         exit_code = pip_main(pip_arguments)
@@ -52,17 +52,19 @@ def run_pip(args : Iterable[str]) -> None:
                 raise InstallerError('pip 执行失败 (退出代码 {code})。'.format(code = exit_code))
 
 
-def locate_python_interpreter() -> str:
+def locate_python_interpreter(require_console : bool = False) -> str:
         """Return a Python interpreter path suitable for launching FaceFusion."""
 
         candidates = []
         if is_windows():
-                candidates.extend(
-                [
-                        os.path.join(os.getenv('CONDA_PREFIX', ''), 'python.exe'),
-                        shutil.which('pythonw'),
-                        shutil.which('python')
-                ])
+                conda_python = os.path.join(os.getenv('CONDA_PREFIX', ''), 'python.exe')
+                python_console = shutil.which('python')
+                python_windowless = shutil.which('pythonw')
+
+                if require_console:
+                        candidates.extend([ conda_python, python_console, python_windowless ])
+                else:
+                        candidates.extend([ conda_python, python_windowless, python_console ])
         else:
                 candidates.extend(
                 [
