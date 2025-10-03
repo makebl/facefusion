@@ -19,6 +19,12 @@ Installation
 
 Be aware, the [installation](https://docs.facefusion.io/installation) needs technical skills and is not recommended for beginners. In case you are not comfortable using a terminal, our [Windows Installer](https://windows-installer.facefusion.io) and [macOS Installer](https://macos-installer.facefusion.io) get you started.
 
+### Desktop installer
+
+Run `python desktop_installer.py` to launch a simple graphical helper that installs the required dependencies with a single click and offers to start FaceFusion once the setup is complete.
+
+To distribute the helper as a standalone Windows executable, install [PyInstaller](https://pyinstaller.org) and run `python build_facefusion_installer.py`. The resulting `FaceFusionInstaller.exe` is written to the `dist/` directory and contains everything needed to install the environment and immediately start FaceFusion.
+
 
 Usage
 -----
